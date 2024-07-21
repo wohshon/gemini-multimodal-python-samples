@@ -41,6 +41,23 @@ def get_doctype_prompt():
     """    
     return text
 
+# returns the prompt extracting information from doc
+# this prompt is not optimized but more for demo purposes
+# TODO further refine prompt by checking doctype
+def get_extractinfo_prompt():
+    text = """
+        this is a document submitted as part of a medical insurance expense claim. It includes a patient's clinical history , doctor's diagnosis and itemized billing items.
+        It contains both handwritten and printed information
+        1.  Extract the patient information
+        2.  Extract the hospital admission and discharge dates; or date of visit.
+        3.  Extract the diagnosis and operation / procedure performed?
+        4.  Please extract all the information in the bill,  return them in table format
+        5. Please extract all the information in the bill, return them in json format
+        If the information is not clear or the image quality is bad, do not make things up
+            """    
+    return text
+
+
 # returns the system instructions, this is a context / instruction for the model
 def get_system_instructions():
     system_instruction_text = """
@@ -49,7 +66,8 @@ def get_system_instructions():
     return system_instruction_text
 
 # construct a json request object for the rest api call
-def construct_request_object(name):
+# mode: purpose of request, is it for checking doc type or extracting info?
+def construct_request_object(name, mode):
     request_json = {}
     inlineData = {}
     # TODO, detect mime type using filename
@@ -59,7 +77,10 @@ def construct_request_object(name):
     parts_object = {}
     parts_object['inlineData'] = inlineData
     parts_object_text = {}
-    parts_object_text['text'] = get_doctype_prompt()
+    if (mode == 'doctype'):
+        parts_object_text['text'] = get_doctype_prompt()
+    elif (mode =='extract'):
+        parts_object_text['text'] = get_extractinfo_prompt()
     parts.append(parts_object)
     parts.append(parts_object_text)
 
@@ -105,7 +126,7 @@ def get_config(config_name):
 # main method to determine the type of document that is submitted based on the contents
 def check_document_type(name):
     print("checking document type for "+ name)
-    request = construct_request_object(name)
+    request = construct_request_object(name,'doctype')
     # print(request)
 
     project_id = get_config('project_id')
@@ -147,8 +168,39 @@ def get_document_bytes(name):
 
 # main method to extract informtion for the submitted documents
 def extract_info(name):
-    print(name+ ' Extract information')
-    # TODO 
+    print(name+ ': Extract information')
+    request = construct_request_object(name,'extract')
+    project_id = get_config('project_id')
+    model_id = get_config('model_id')
+    api_url = get_config('api_url')
+    api_url = api_url.format(project_id=project_id, model_id=model_id)
+    # print(api_url)
+    # getting bearer token for REST API, if using SDK this is not needed
+    auth_req = google.auth.transport.requests.Request()
+    creds.refresh(auth_req)
+    # print(creds.token)
+    # Now you can use creds.token
+    headers = {
+        "Authorization": "Bearer " + creds.token,
+        "Content-Type":"application/json"
+    }
+    response = requests.post(api_url, data=request, headers=headers)
+    json_object = response.json()
+    # print(response.json())
+    # uncomment below if you wants to save the output json files
+    """
+    # save json output to a local file
+    with open(name.replace(".","_").replace(" ","_")+'_gemini_'+model_id+'_extract_info.json', 'w') as f:
+        json.dump(response.json(), f, ensure_ascii=False)
+    print("written json response to file")    
+    """
+    # printout results
+    output = json_object['candidates'][0]['content']['parts'][0]['text']
+    print(output)
+    # j = json.loads(output)
+    # print(j['docType'])
+    return output
+
 
 
 
@@ -156,9 +208,6 @@ def extract_info(name):
 # export PROJECT_ID=<your project id>
 
 init_config()
-print("=========Check Document Type====================")
-print("This is the prompt used to check document type")
-print(get_doctype_prompt())
 # Update this file list 
 # create a 'file_list.txt with a comma separated list of file names: bill 1.pdf,submission claim.pdf etc
 file = open('file_list.txt', 'r')
@@ -168,10 +217,29 @@ docs_file_name = file.read().split(',')
 # Update this for your environment
 path = "docs/"
 
+# comment off as needed
+
+# uncomment this if need to run the doc type check 
+# """
+print("=========Check Document Type====================")
+print("This is the prompt used to check document type")
+print(get_doctype_prompt())
 for file_name in docs_file_name:
     print('============================================================='+file_name)
     response = check_document_type(file_name)
     print('Output: ')
     print(file_name + ' document type is: '+response['docType'])
-
+# """
+# uncomment this if need to run the extract info
+"""
+print("=========Extract Info====================")
+print("This is the prompt used to extract document info")
+print(get_extractinfo_prompt())
+for file_name in docs_file_name:
+    print('============================================================='+file_name)
+    response = extract_info(file_name)
+    print('Output: ')
+    print(file_name + ' Extracted Info:')
+    print(response)
+"""
 
