@@ -111,13 +111,14 @@ def construct_request_object(name, mode):
     request = json.dumps(request_json)
     return request
 
-config = {}
 # initialise configurations
+config = {}
 # export PROJECT_ID=<your project id>
 def init_config():
     config['project_id'] = os.environ['PROJECT_ID']
     config['model_id'] = "gemini-1.5-flash-001"
-    config['api_url'] = "https://us-central1-aiplatform.googleapis.com/v1/projects/{project_id}/locations/us-central1/publishers/google/models/{model_id}:generateContent"
+    config['location'] = 'us-central1'
+    config['api_url'] = "https://us-central1-aiplatform.googleapis.com/v1/projects/{project_id}/locations/{location}/publishers/google/models/{model_id}:generateContent"
     print('configurations initialized')
 
 def get_config(config_name):
@@ -132,7 +133,8 @@ def check_document_type(name):
     project_id = get_config('project_id')
     model_id = get_config('model_id')
     api_url = get_config('api_url')
-    api_url = api_url.format(project_id=project_id, model_id=model_id)
+    location = get_config('location')
+    api_url = api_url.format(project_id=project_id, location=location,model_id=model_id)
     # print(api_url)
     # getting bearer token for REST API, if using SDK this is not needed
     auth_req = google.auth.transport.requests.Request()
@@ -146,7 +148,7 @@ def check_document_type(name):
     response = requests.post(api_url, data=request, headers=headers)
     json_object = response.json()
     # print(response.json())
-    # uncomment below if you wants to save the output json files
+    # uncomment below if you wants to save the output json files to a local dir
     """
     # save json output to a local file
     with open(name.replace(".","_").replace(" ","_")+'_gemini_'+model_id+'.json', 'w') as f:
@@ -187,7 +189,7 @@ def extract_info(name):
     response = requests.post(api_url, data=request, headers=headers)
     json_object = response.json()
     # print(response.json())
-    # uncomment below if you wants to save the output json files
+    # uncomment below if you wants to save the output json files to a local directory
     """
     # save json output to a local file
     with open(name.replace(".","_").replace(" ","_")+'_gemini_'+model_id+'_extract_info.json', 'w') as f:
@@ -209,7 +211,7 @@ def extract_info(name):
 
 init_config()
 # Update this file list 
-# create a 'file_list.txt with a comma separated list of file names: bill 1.pdf,submission claim.pdf etc
+# create a 'file_list.txt with a comma separated list of file names: claim 1.pdf,submission claim.pdf etc
 file = open('file_list.txt', 'r')
 # this sample assumes all are pdf files, if there are different file types, change construct_request_object() to handle the mime_type
 docs_file_name = file.read().split(',')
@@ -219,7 +221,7 @@ path = "docs/"
 
 # comment off as needed
 
-# uncomment this if need to run the doc type check 
+# uncomment this if you want to run the doctype check 
 # """
 print("=========Check Document Type====================")
 print("This is the prompt used to check document type")
@@ -230,7 +232,7 @@ for file_name in docs_file_name:
     print('Output: ')
     print(file_name + ' document type is: '+response['docType'])
 # """
-# uncomment this if need to run the extract info
+# uncomment this if want to extract info from the documents
 """
 print("=========Extract Info====================")
 print("This is the prompt used to extract document info")
